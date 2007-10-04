@@ -3,7 +3,7 @@
 #
 # BeanCounter.pm --- A stock portfolio performance monitoring tool
 #
-# Copyright (C) 2000 - 2004 Dirk Eddelbuettel <edd@debian.org>
+# Copyright (C) 2000 - 2005 Dirk Eddelbuettel <edd@debian.org>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,28 +19,32 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #
-# $Id: Makefile.PL,v 1.2 2004/01/22 01:08:23 edd Exp $
+# $Id: Makefile.PL,v 1.3 2004/04/03 15:22:18 edd Exp edd $
 #
-                                                          
+
 use ExtUtils::MakeMaker;
 
 WriteMakefile(
 	      'NAME'		=> 'Finance::BeanCounter',
-	      'VERSION'		=> '0.1.0',
+	      'VERSION'		=> '0.8.8',
 	      'PREREQ_PM'   	=> { "LWP::UserAgent"   => 1.62,
 				     "HTTP::Request"    => 1.23,
 				     "HTML::Parser"     => 2.20,
 				     "Text::ParseWords" => 3.1,
 				     "Date::Manip"	=> 5.35,
 				     "DBI"		=> 1.16,
-				     "DBD::Pg"		=> 0.93,
-				     ## "DBD::ODBC"	=> 0.28,
-				     ## "DBD::mysql"	=> 2.0416,
-				     "Statistics::Descriptive" => 2.4
-				   },      
+				     ## and any one of these
+				     ##   "DBD::Pg"	=> 0.93,
+				     ##   "DBD::ODBC"	=> 0.28,
+				     ##   "DBD::mysql"	=> 2.0416,
+				     ##   "DBD::SQLite" => 1.0,    # v3
+				     ##   "DBD::SQLite2"=> 0.33
+				     "Statistics::Descriptive" => 2.4,
+				     "Finance::YahooQuote" => 0.20
+				   },
 	      ($] >= 5.005 ?
 	       ('ABSTRACT'   => 'Stock portfolio performance monitoring tool',
-		'AUTHOR'     	=> 'Dirk Eddelbuettel (edd@debian.org)') 
+		'AUTHOR'     	=> 'Dirk Eddelbuettel (edd@debian.org)')
 	       : ()
 	      ),
 	      EXE_FILES 	=> ['beancounter', 

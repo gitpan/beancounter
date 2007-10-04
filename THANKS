@@ -13,7 +13,7 @@ Mathias Weidner <mathias@weidner.in-bad-schmiedeberg.de>
 	for initial MySQL patches, numerous design discussions + suggestions
         and the patch to allow 'update' to either insert or update
 Max Bott <Max.Bott@affa.gov.au> 
-	for the bug report on quotes in company name's (DatabaseInfoData)      
+	for the bug report on quotes in company name's (DatabaseInfoData)   
 Peter Kim <pykim@gte.net>
         for the update-in-batches-of-100 patch 
 Ken Neighbors <ken@nsds.com> 
@@ -31,12 +31,31 @@ Thomas Walter
 Robert A. Schmied
         for a thoughtful set of patches to beancounter, BeanCounter.pm
 	setup_beancounter and update_beancounter. First Grand Slam winner :)
+	And even more so for continued suggestions, testing and patches.
 Mike Castle
-        for a patch with more consistent upper/lower case of BeanCounter
+        for a patch with more consistent upper/lower case use in BeanCounter
 Joao Pedro
-        for pointing out that password should be passwd in example.beancounterrc
+        for noting that password should be passwd in example.beancounterrc
 Phil Homewood
         for a patch dealing with 'times 100' scaling in FX rates 
+Joao Antunes Costa for two patches testing for NAs in db updates, and
+        ensuring firewall proxy information is set
+Kevin Kim 
+        for patches integrating beancounter with smtm
+Matthew Jurgens
+	for a patch letting the non-US historical run batches of just 
+        under 200 data points to accomodate a Yahoo! restriction
+Oliver Muth
+        for noticing that beancounter still used 'password' in the docs
+        for the optional 'passwd' argument for db connections
+Rene Cunningham 
+        for a patch to prevent a division-by-zero if adjusted close was zero
+Pieter du Preez
+        for a very comprehensive patch set that improved my code a lot
+Jesse Chu
+        for noticing that closes weren't set to adj closes in backpopulating
+Doug Laidlaw
+        for an updated rpm spec file
 
 and all the kind folks who dropped a line to either report a bug, and/or 
 say that they liked the program... 

@@ -1,8 +1,8 @@
-#! /bin/sh -e
+#! /bin/bash -e
 #
 #   setup_beancounter --- Example usage of the beancounter tool
 #  
-#   Copyright (C) 2000 - 2004  Dirk Eddelbuettel <edd@debian.org>
+#   Copyright (C) 2000 - 2006  Dirk Eddelbuettel <edd@debian.org>
 #  
 #   This program is free software; you can redistribute it and/or modify
 #   it under the terms of the GNU General Public License as published by
@@ -18,21 +18,32 @@
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#   $Id: setup_beancounter,v 1.28 2004/01/24 23:48:33 edd Exp $
+#   $Id: setup_beancounter,v 1.41 2006/03/22 04:15:28 edd Exp $
 
-# If we really want to be independent of the underlying database, this 
-# probably needs to written in Perl using DBI/DBD
+#  If we really want to be independent of the underlying database, this 
+#  probably needs to written in Perl using DBI/DBD
 #
-# This once started as being PostgreSQL specific
+#  This once started as being PostgreSQL specific ...
 #
-# MySQL patches by Mathias Weidner <mathias@weidner.in-bad-schmiedeberg.de>
+#  MySQL patches by Mathias Weidner <mathias@weidner.in-bad-schmiedeberg.de>
+#
+#  SQLite support was added some time in 2003.
+#
+#  As of 2005-04-13, two SQLite versions are supported: the new SQLite3 is the
+#  default, but with option -o $file, the previous version can be used.  This
+#  assumes a layout as on Debian systems, i.e.
+#
+#   				current v3	previous v2
+#      binary programs		sqlite3		sqlite
+#      Perl DBI Module		DBD::SQLite	DBD::SQLite2
+#
+#  i.e. a binary program 'sqlite3' is used to create a database for SQLite 3.*
+#  for which Perl code uses the DBD::SQLite module --- whereas 'sqlite' invokes
+#  the binary for the previous release SQLite 2.* for which Perl uses DBD::SQLite2
+#  If this differs on your system, you need to adjust the assignments of 
+#  DBCOMMAND below, and/or adjust BeanCounter.pm for the proper Perl module.
 
 # -------------------------- 'global' variables
-
-# make sure we get this beancounter first
-#echo "DEVELOPMENT VERSION"
-#export PATH=".:$PATH"
-#echo "Using local path: $PATH"
 
 progname=$(basename $0)
 
@@ -42,9 +53,7 @@ then
 fi
 
 DATABASE='beancounter'
-VERSION='0.7.2'
-#DATABASE='testbean'
-#PASSWORD=
+VERSION='0.8.8'
 DBSYSTEM='PostgreSQL'
 #DBSYSTEM='MySQL'
 SCHEMA_ONLY=0
@@ -59,7 +68,7 @@ fi
 
 # Dow Jones Industrial Average 
 # see for example http://www.amex.com/indexshares/index_shares_diamonds_list.stm
-DJIA="AA AXP T BA CAT C KO DIS DD EK XOM GE GM HPQ HD HON INTC IBM IP JNJ MCD MRK MSFT MMM JPM MO PG SBC UTX WMT"
+DJIA="AA AXP T BA CAT C KO DIS DD EK XOM GE GM HPQ HD HON INTC IBM IP JNJ MCD MRK MSFT MMM JPM MO PG T UTX WMT"
 
 # S&P500 is at http://www.spglobal.com/ssindexmain500text.html
 # NASDAQ is at http://www.nasdaq.com/asp/nasdaq100_activity.stm
@@ -75,7 +84,8 @@ Usage: $progname [-m] [-n databasename] [-h]
 Options:
     -m		Use MySQL instead of PostgreSQL
     -n SOMENAME Create database as SOMENAME instead of beancounter
-    -l dbfile   Use SQLite as the backend with database file 'dbfile'
+    -l dbfile   Use SQLite3 (current version) as backend with file 'dbfile'
+    -o dbfile   Use SQLite (old v2) as backend with file 'dbfile'
     -s		Schema only -- Do not fill the database
     -h		Show this help
 EOF
@@ -155,7 +165,7 @@ function create_mysql_tables
 	day_change float default NULL,
 	bid float default NULL,
 	ask float default NULL,
-	volume int(11) default NULL,
+	volume numeric default NULL,
 	UNIQUE KEY stockprices_pkey(symbol,date)
     ) TYPE=MyISAM;
 
@@ -210,7 +220,7 @@ function create_postgres_tables
 	    day_change		float4 default null,
 	    bid			float4 default null,
 	    ask			float4 default null,
-	    volume		int4 default null
+	    volume		numeric default null
 	);
 	create unique index stockprices_pkey
 	    on stockprices (symbol, date);
@@ -297,7 +307,7 @@ function create_sqlite_tables
 	    day_change		float4 default null,
 	    bid			float4 default null,
 	    ask			float4 default null,
-	    volume		int4 default null
+	    volume		numeric default null
 	);
 	create unique index stockprices_pkey
 	    on stockprices (symbol, date);
@@ -353,7 +363,7 @@ function exit_if_exists
 	result=`echo 'show databases'| $DBCOMMAND | grep $DATABASE`
     elif [ "$DBSYSTEM" = "PostgreSQL" ]; then
 	result=`$DBCOMMAND template1 -l | grep $DATABASE`
-    elif [ "$DBSYSTEM" = "SQLite" ]; then
+    elif [ "$DBSYSTEM" = "SQLite" ] || [ "$DBSYSTEM" = "SQLite3" ]; then
 	result=`test -f $DATABASE && ls -1 $DATABASE`
     fi
     set -e
@@ -370,7 +380,7 @@ function exit_if_exists
 	echo "If you want to delete the exiting database, use"
 	echo "    dropdb $DATABASE       	for PostgreSQL"
 	echo "    mysqladmin -f drop $DATABASE	for MySQL"
-	echo "    rm $DATABASE	                for SQLite"
+	echo "    rm $DATABASE	                for SQLite, SQLite3"
 	echo ""
 	exit 1
     fi
@@ -453,7 +463,7 @@ function exit_if_no_mysql_user
 
 # ------------------------ 'main' code -------------------------------------
 
-while getopts ":mn:l:sh" opt
+while getopts ":mn:l:o:sh" opt
 do
     case $opt in
 	m)
@@ -467,7 +477,14 @@ do
 	l)
 	    DBSYSTEM='SQLite'
 	    DATABASE=$OPTARG
-	    echo "Now using $DBSYSTEM on $DATABASE"
+	    DBCOMMAND="sqlite3"
+	    echo "Now using (current) SQLite3 on $DATABASE"
+	    ;;
+	o)
+	    DBSYSTEM='SQLite2'
+	    DATABASE=$OPTARG
+	    DBCOMMAND="sqlite"
+	    echo "Now using (old) SQLite on $DATABASE"
 	    ;;
 	s)
 	    SCHEMA_ONLY=1
@@ -483,7 +500,6 @@ done
 
 BEANCOUNTER="beancounter --dbsystem $DBSYSTEM --dbname $DATABASE"
 
-DBCOMMAND=""
 if [ "$DBSYSTEM" = "PostgreSQL" ]; then		# if Postgres 
     if [ -z "$PASSWORD" ]; then
 	DBCOMMAND="psql -q"
@@ -497,8 +513,10 @@ elif [ "$DBSYSTEM" = "MySQL" ]; then 		# if MySQL
     else
 	DBCOMMAND="mysql -p$PASSWORD"
     fi
-elif [ "$DBSYSTEM" = "SQLite" ]; then 		# if SQLite 
-    DBCOMMAND="sqlite"
+elif [ "$DBSYSTEM" = "SQLite" ]; then 		# if SQLite v3
+    true					# nothing to do
+elif [ "$DBSYSTEM" = "SQLite2" ]; then 		# if SQLite v2
+    true					# nothing to do
 else
     echo ""
     echo "*** Error: Unsupported database system ***"
@@ -520,27 +538,27 @@ fi
 
 # test if $DATABASE exists and exit if true
 exit_if_exists
-			
-echo "Creating $DATABASE database"
-if [ "$DBSYSTEM" = "PostgreSQL" ]; then
-    execute "createdb $DATABASE"
-elif [ "$DBSYSTEM" = "MySQL" ]; then
-    echo "create database $DATABASE;" | $DBCOMMAND 
-# NB deleting db under MySQL is:  mysqladmin drop beancounter_test -p$PASSWORD
-# grant access to $DATABASE db
-#GRANT="grant select,delete,insert,update on $DATABASE.* to $USER@localhost"
-#echo $GRANT | $DBCOMMAND
-elif [ "$DBSYSTEM" = "SQLite" ]; then
-    true # do nothing
+
+if [ "$DBSYSTEM" = "PostgreSQL" ] || [ "$DBSYSTEM" = "MySQL" ]; then
+    echo "Creating $DATABASE database"
+    if [ "$DBSYSTEM" = "PostgreSQL" ]; then
+        execute "createdb $DATABASE"
+    elif [ "$DBSYSTEM" = "MySQL" ]; then
+        echo "create database $DATABASE;" | $DBCOMMAND 
+    # NB deleting db under MySQL is:  mysqladmin drop beancounter_test -p$PASSWORD
+    # grant access to $DATABASE db
+    #GRANT="grant select,delete,insert,update on $DATABASE.* to $USER@localhost"
+    #echo $GRANT | $DBCOMMAND
+    fi
+    echo ""
 fi
-echo ""
 
 echo "Creating $DATABASE database tables"
 if [ "$DBSYSTEM" = "PostgreSQL" ]; then
     create_postgres_tables 
 elif [ "$DBSYSTEM" = "MySQL" ]; then
     create_mysql_tables 
-elif [ "$DBSYSTEM" = "SQLite" ]; then
+elif [ "$DBSYSTEM" = "SQLite2" ] || [ "$DBSYSTEM" = "SQLite" ]; then
     create_sqlite_tables
 fi
 
@@ -549,23 +567,41 @@ if [ "$SCHEMA_ONLY" -eq 1 ]; then
     exit 0
 fi
 
+if [ "$DBSYSTEM" = "PostgreSQL" ] || [ "$DBSYSTEM" = "MySQL" ]; then
+    # testing database access from Perl
+    echo "Verifying database access from Perl"
+    set +e
+    $BEANCOUNTER checkdbconnection
+    rc="$?"
+    if [ "$rc" != 1 ]
+    then
+       echo "Failure --- please check database permission, possible"
+       echo "requirement of a password and other sources of failure"
+       echo "to establish a connection."
+       exit 1
+    fi
+    set -e
+fi
+
 # insert the DJIA stocks into the indices table
 echo "Filling $DATABASE database tables with DJIA stocks"
 execute "$BEANCOUNTER addindex DJIA $DJIA"
 
 # create an example of tech stocks
 echo "Filling $DATABASE (sample) portfolio"
-execute "$BEANCOUNTER addportfolio CSCO:50:USD NT.TO:100:CAD SIEGn.DE:10:EUR CGEP.PA:50:EUR"
+#execute "$BEANCOUNTER addportfolio CSCO:50:USD NT.TO:100:CAD SIE.DE:10:EUR CGE.PA:50:EUR"
+execute "$BEANCOUNTER addportfolio IBM:50:USD XOM:75:USD C:100:USD GOOG:25:USD"
 
 echo -n "Filling $DATABASE with stock info and most recent prices "
 echo "for DJIA stocks"
-execute "$BEANCOUNTER addstock $DJIA"
+execute "$BEANCOUNTER addstock $DJIA ^GSPC"
 
 echo "Filling $DATABASE with historical prices for example portfolio stocks"
-execute "$BEANCOUNTER backpopulate --prevdate '1 year ago' --date '$LASTBIZDAY' CSCO NT.TO SIEGn.DE CGEP.PA"
+#execute "$BEANCOUNTER backpopulate --prevdate '1 year ago' --date '$LASTBIZDAY' CSCO NT.TO SIE.DE CGE.PA"
+execute "$BEANCOUNTER backpopulate --prevdate '1 year ago' --date '$LASTBIZDAY' IBM XOM C GOOG ^GSPC"
 
 echo "Filling $DATABASE with historical fx prices for EUR and CAD"
-execute "$BEANCOUNTER fxbackpopulate --prevdate '1 year ago'  --date '$LASTBIZDAY' EUR CAD"
+execute "$BEANCOUNTER fxbackpopulate --ubcfx --prevdate '1 year ago' --date '$LASTBIZDAY' EUR CAD"
 
 echo "Running portfolio pl report on (sample) portfolio"
 execute "$BEANCOUNTER plreport --date '$LASTBIZDAY'"
@@ -599,7 +635,8 @@ of the features of B<beancounter>.
 =head1 OPTIONS
 
  -m        Use MySQL as the backend over the default PostgreSQL
- -l dbfile Use SQLite as the backend with database file 'dbfile'
+ -l dbfile Use SQLite \(version 3 or later\) with database file 'dbfile'
+ -o dbfile Use SQLite2 \(compatibility mode\) with database file 'dbfile'
  -n name   Use name as the database instead of beancounter
  -s        Do not fill the database, only create its schema
  -h        Show a simple help message
